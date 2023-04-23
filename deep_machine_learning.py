@@ -67,17 +67,13 @@ freq_model = torch.zeros((2, tokenizer.max_token_id()))
 with torch.no_grad():
     for sample in dataset_train:
         freq_model[sample["label"]][sample["token_list"]] += 1
-        # for token in sample["token_list"]:
-        #     freq_model[sample["label"]][token] += 1
 
 
 def build_prob_model(laplace_factor=1):
-    print("building")
     prob_model = torch.zeros(freq_model.shape)
     with torch.no_grad():
         prob_model[0][:] = torch.log((1 * laplace_factor + freq_model[0][:]) / (2 * laplace_factor + freq_model[0][:] + freq_model[1][:]))
         prob_model[1][:] = torch.log((1 * laplace_factor + freq_model[1][:]) / (2 * laplace_factor + freq_model[0][:] + freq_model[1][:]))
-    print("built")
     return prob_model
 
 
@@ -87,15 +83,13 @@ def eval(dataset=dataset_valid, calibration_factor=1, log=True):
     TPs, FPs, FNs, TNs = [], [], [], []
 
     for sample in dataset:
-        prob = torch.zeros(2)
+        prob = torch.tensor([0.0, math.log(calibration_factor)])
         prob[0] = prob_model[0][sample["token_list"]].sum()
         prob[1] = prob_model[1][sample["token_list"]].sum()
 
-        # for token in sample["token_list"]:
-        #     prob[0] += prob_model[0][token]
-        #     prob[1] += prob_model[1][token]
+        prob = F.softmax(prob, dim=0)
 
-        predict = bool(prob[1] + math.log(calibration_factor) > prob[0])
+        predict = bool(prob[1] > prob[0])
 
         if predict == bool(sample["label"]):
             acc += 1
@@ -143,7 +137,7 @@ def calibrate(dataset=dataset_train):
     print("calibrating")
 
     for i in range(40):
-        calibration_factor = 0.6 + i / 50
+        calibration_factor = 0.2 + i / 20
         TPs, FPs, FNs, TNs, acc, f1 = eval(dataset, calibration_factor, False)
         if acc > max_acc:
             max_acc = acc
@@ -152,7 +146,7 @@ def calibrate(dataset=dataset_train):
             max_f1 = acc
             max_f1_calibration_factor = calibration_factor
     
-    return max_f1_calibration_factor
+    return max_acc_calibration_factor
 
 
 def experiment_on_laplace_factor(dataset=dataset_train):
@@ -176,16 +170,16 @@ def experiment_on_laplace_factor(dataset=dataset_train):
             max_f1 = acc
             max_f1_laplace_factor = laplace_factor
     
-    return max_f1_laplace_factor
+    return max_acc_laplace_factor
 
 if __name__ == "__main__":
     laplace_factor = 1
-    # laplace_factor = experiment_on_laplace_factor(dataset_valid)
-    # print("laplace factor:", laplace_factor)
+    laplace_factor = experiment_on_laplace_factor(dataset_valid)
+    print("laplace factor:", laplace_factor)
     prob_model = build_prob_model(laplace_factor)
 
-    # calibration_factor = calibrate(dataset_valid)
-    # print("calibration factor:", calibration_factor)
+    calibration_factor = calibrate(dataset_valid)
+    print("calibration factor:", calibration_factor)
     calibration_factor = 1
 
     print("on train:")
