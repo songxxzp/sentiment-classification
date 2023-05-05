@@ -34,10 +34,10 @@ class Trainer:
                 dataloader=dataloader_train,
                 optimizer=optimizer,
                 scheduler=scheduler,
-                device=device
+                device=self.device
             )
             print(e + 1, train_loss, train_acc, train_f1)
-            val_loss, val_acc, val_f1 = test(model, dataloader_valid, device=device)
+            val_loss, val_acc, val_f1 = test(model, dataloader_valid, device=self.device)
             print(e + 1, val_loss, val_acc, val_f1)
 
             self.log(e + 1, train_loss, train_acc, train_f1, val_loss, val_acc, val_f1)
@@ -50,12 +50,12 @@ class Trainer:
         if save_model_path is not None:
             torch.save(model.state_dict(), save_model_path)
 
-        test_loss, test_acc, test_f1 = test(model, dataloader_test, device=device)
+        test_loss, test_acc, test_f1 = test(model, dataloader_test, device=self.device)
         print(epoch, test_loss, test_acc, test_f1)
 
         if save_result_path is not None:
-            train_loss, train_acc, train_f1 = test(model, dataloader_train, device=device)
-            val_loss, val_acc, val_f1 = test(model, dataloader_valid, device=device)
+            train_loss, train_acc, train_f1 = test(model, dataloader_train, device=self.device)
+            val_loss, val_acc, val_f1 = test(model, dataloader_valid, device=self.device)
             with open(save_result_path, 'w', encoding="utf-8") as f:
                 result = {
                     "log": self.logger,

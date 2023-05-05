@@ -64,6 +64,24 @@ class TextLSTM(nn.Module):
         return hidden_state
 
 
+class TextGRU(nn.Module):
+    def __init__(self, embedding_dim=50, hidden_size=50, num_layers=1, bidirectional=False):
+        super().__init__()
+        self.GRU = nn.GRU(
+            input_size=embedding_dim,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            bidirectional=bidirectional
+        )
+
+    def forward(self, hidden_state: torch.Tensor) -> torch.Tensor:
+        # hidden_state.shape = [batch_size, seq_length, embedding_dim]
+        hidden_state = hidden_state.transpose(1, 0)  # [seq_length, batch_size, embedding_dim]
+        output, hidden_state = self.GRU(hidden_state)
+        hidden_state = hidden_state.transpose(0, 1)  # [batch_size, num_layers * bidirectional, embedding_dim]
+        return hidden_state
+
+
 class Classifier(nn.Module):
     def __init__(self, base_model: nn.Module, vocab_size, embedding_dim=50, hidden_size=50, num_classs=2, pretrained_embedding: torch.Tensor=None, embedding_requires_grad=True) -> None:
         super().__init__()
