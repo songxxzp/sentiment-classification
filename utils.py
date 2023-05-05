@@ -1,4 +1,39 @@
 import json
+import torch
+from gensim.models import KeyedVectors
+from typing import Dict, List
+from functools import partial
+
+from dataset import CustomDataset
+
+
+class Tokenizer:
+    def __init__(self, index_to_key: List):
+        self.index_to_key = index_to_key
+        self.key_to_index = {}
+        for index, key in enumerate(index_to_key):
+            self.key_to_index[key] = index
+
+        self.unk = self.key_to_index["<unk>"]
+        self.pad = self.key_to_index["<pad>"]
+
+    def encode(self, word_list):
+        token_list = list(map(lambda word:self.key_to_index[word] if word in self.key_to_index else self.unk, word_list))
+        return token_list
+
+    def decode(self, token_list):
+        word_list = list(map(lambda token:self.index_to_key[token] if token in self.index_to_key else "", token_list))
+        return word_list
+
+    def max_token_id(self):
+        return len(self.index_to_key)
+
+
+def load_word_vector(path='./Dataset/wiki_word2vec_50.bin'):
+    word2vec_model = KeyedVectors.load_word2vec_format(path, binary=True)
+    pretrained_embedding = torch.cat([torch.zeros((1, 50)), torch.tensor(word2vec_model.vectors), torch.zeros((1, 50))])
+    vocab = ["<pad>"] + word2vec_model.index_to_key + ["<unk>"]
+    return pretrained_embedding, vocab
 
 
 def process_fn(sample, tokenizer=None):
@@ -11,9 +46,38 @@ def process_fn(sample, tokenizer=None):
         token_list = None
     return {
         "label": int(label),
-        "token_list": token_list,
+        "tokens": token_list,
+        "word_list": word_list,
         "sentence": "".join(word_list)
     }
+
+
+def collate_fn(samples, tokenizer=None):
+    pad = 0
+    if tokenizer is not None:
+        pad = tokenizer.pad
+
+    max_length = max([len(sample["tokens"]) for sample in samples])
+
+    return {
+        "labels": torch.tensor([sample["label"] for sample in samples]),
+     	"tokens": torch.tensor([sample["tokens"] + [pad] * (max_length - len(sample["tokens"])) for sample in samples]),
+    }
+
+
+def build_dataset(tokenizer, train_data_path="./Dataset/train.txt", valid_data_path="./Dataset/validation.txt", test_data_path="./Dataset/test.txt"):
+    dataset_train = CustomDataset(train_data_path, process_fn=partial(process_fn, tokenizer=tokenizer))
+    dataset_valid = CustomDataset(valid_data_path, process_fn=partial(process_fn, tokenizer=tokenizer))
+    dataset_test = CustomDataset(test_data_path, process_fn=partial(process_fn, tokenizer=tokenizer))
+    return dataset_train, dataset_valid, dataset_test
+
+
+def accuracy(results, labels):
+    pass
+
+
+def f1(results, labels):
+    pass
 
 
 def load_data(train_set="./Dataset/train.txt", valid_set="./Dataset/validation.txt", test_set="./Dataset/test.txt"):
