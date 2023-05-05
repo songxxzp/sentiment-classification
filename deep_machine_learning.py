@@ -82,12 +82,17 @@ def eval(dataset=dataset_valid, calibration_factor=1, log=True):
     TP, FP, FN, TN = 0, 0, 0, 0
     TPs, FPs, FNs, TNs = [], [], [], []
 
-    for sample in dataset:
-        prob = torch.tensor([0.0, math.log(calibration_factor)])
-        prob[0] = prob_model[0][sample["token_list"]].sum()
-        prob[1] = prob_model[1][sample["token_list"]].sum()
+    logits = []
+    targets = []
 
-        prob = F.softmax(prob, dim=0)
+    for sample in dataset:
+        logit = torch.tensor([0.0, math.log(calibration_factor)])
+        logit[0] = prob_model[0][sample["token_list"]].sum()
+        logit[1] = prob_model[1][sample["token_list"]].sum()
+
+        logits.append(logit.tolist())
+        targets.append([0, 1] if sample["label"] else [1, 0])
+        prob = F.softmax(logit, dim=0)
 
         predict = bool(prob[1] > prob[0])
 
@@ -109,12 +114,17 @@ def eval(dataset=dataset_valid, calibration_factor=1, log=True):
                 TN += 1
                 TNs.append(sample)
 
+    logits = torch.tensor(logits, dtype=torch.float)
+    targets = torch.tensor(targets, dtype=torch.float)
+    loss = F.cross_entropy(logits, targets)
+
     acc = acc / len(dataset)
     precision = TP / (TP + FP)
     recall = TP / (TP + FN)
     f1 =  2 / (1 / precision + 1 / recall)
 
     if log:
+        print("loss:", loss.tolist())
         print("    p    n")
         print("Y", str(TP).zfill(4), str(FP).zfill(4))
         print("N", str(FN).zfill(4), str(TN).zfill(4))
@@ -123,6 +133,7 @@ def eval(dataset=dataset_valid, calibration_factor=1, log=True):
         print("recall:", recall)
         print("f1:", f1)
         print("acc:", acc)
+        print()
     
     return TPs, FPs, FNs, TNs, acc, f1
 
