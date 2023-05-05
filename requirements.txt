@@ -1,0 +1,16 @@
+datasets==2.10.1
+gensim
+huggingface-hub
+matplotlib
+nltk
+numpy
+scikit-learn
+scipy
+six
+tokenizers==0.13.2
+torch==2.0.0
+torchaudio==2.0.0
+torchvision==0.15.1
+tqdm
+transformers==4.27.2
+tensorboard

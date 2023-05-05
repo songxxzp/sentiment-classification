@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     model = Classifier(TextGRU(num_layers=2, bidirectional=True), vocab_size=len(vocab), hidden_size=50, pretrained_embedding=pretrained_embedding).to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epoch)
 
     trainer = Trainer(train_dataset, valid_dataset, test_dataset, tokenizer, early_stop_strategy="val_loss", early_stop_epoch=5, device=device)

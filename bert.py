@@ -52,6 +52,7 @@ def train_bert_classifier(model_name="hfl/chinese-roberta-wwm-ext", log_path="./
 
     training_args = TrainingArguments(
         logging_dir=log_path,
+        report_to="tensorboard",
         output_dir=save_path,
         save_strategy="no",
         learning_rate=2e-5,
