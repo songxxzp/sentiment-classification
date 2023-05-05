@@ -10,6 +10,52 @@ from models import TextCNN, TextLSTM, MLP, Classifier
 from utils import load_word_vector, Tokenizer, build_dataset, collate_fn, metric_f1, metric_accuracy
 
 
+class Trainer:
+    def __init__(self, early_stop_epoch=0, early_stop_strategy=None):
+        self.logger = []
+        self.early_stop_epoch = early_stop_epoch
+        self.early_stop_strategy = early_stop_strategy
+
+    def log(self, epoch, train_loss, train_acc, train_f1, val_loss, val_acc, val_f1):
+        self.logger.append(
+            {
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "train_acc": train_acc,
+                "train_f1": train_f1,
+                "val_loss": val_loss,
+                "val_acc": val_acc,
+                "val_f1": val_f1,
+            }
+        )
+
+    def early_stop(self):
+        if self.early_stop_strategy is None:
+            return False
+
+        if len(self.logger) > self.early_stop_epoch:
+            stop = True
+            if self.early_stop_strategy == "val_loss":
+                for i in range(len(self.logger) - self.early_stop_epoch, len(self.logger)):
+                    if not(self.logger[i - 1]["val_loss"] < self.logger[i]["val_loss"]):
+                        stop = False
+                        break
+            elif self.early_stop_strategy == "val_acc":
+                for i in range(len(self.logger) - self.early_stop_epoch, len(self.logger)):
+                    if not(self.logger[i - 1]["val_acc"] > self.logger[i]["val_acc"]):
+                        stop = False
+                        break
+            elif self.early_stop_strategy == "val_f1":
+                for i in range(len(self.logger) - self.early_stop_epoch, len(self.logger)):
+                    if not(self.logger[i - 1]["val_acc"] > self.logger[i]["val_acc"]):
+                        stop = False
+                        break
+            else:
+                stop = False
+            return stop
+
+        return False
+
 def train_one_epoch(model, dataloader, optimizer, scheduler, criterion=F.cross_entropy, device=torch.device("cuda")):
     model.train()
     train_loss = 0.0
@@ -52,13 +98,9 @@ def test(model, dataloader, criterion=F.cross_entropy, device=torch.device("cuda
     return val_loss, val_acc, f1
 
 
-def early_stop(e, train_loss, train_acc, train_f1, val_loss, val_acc, val_f1):
-    return False  # TODO
-
-
 if __name__ == "__main__":
     batch_size = 256
-    epoch = 40
+    epoch = 100
     device = torch.device("cuda")
 
     pretrained_embedding, vocab = load_word_vector()
@@ -74,10 +116,16 @@ if __name__ == "__main__":
     dataloder_valid = dataloader.DataLoader(dataset_valid, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
     dataloder_test = dataloader.DataLoader(dataset_test, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
 
-    model = Classifier(TextLSTM(num_layers=2, bidirectional=True), vocab_size=len(vocab), hidden_size=50, pretrained_embedding=pretrained_embedding).to(device)
-    
+    # TextLSTM(num_layers=2, bidirectional=True)
+    # MLP()
+    # TextCNN(convs=[{"out_channels":20, "kernel_size":4}, {"out_channels":20, "kernel_size":3}, {"out_channels":10, "kernel_size":2}])
+
+    model = Classifier(TextCNN(convs=[{"out_channels":20, "kernel_size":4}, {"out_channels":20, "kernel_size":3}, {"out_channels":10, "kernel_size":2}]), vocab_size=len(vocab), hidden_size=50, pretrained_embedding=pretrained_embedding).to(device)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epoch)
+
+    trainer = Trainer(early_stop_strategy="val_loss", early_stop_epoch=5)
 
     for e in range(epoch):
         train_loss, train_acc, train_f1 = train_one_epoch(
@@ -91,9 +139,12 @@ if __name__ == "__main__":
         val_loss, val_acc, val_f1 = test(model, dataloder_valid, device=device)
         print(e + 1, val_loss, val_acc, val_f1)
 
-        if early_stop(e, train_loss, train_acc, train_f1, val_loss, val_acc, val_f1):
-            print("early stop")
+        trainer.log(e + 1, train_loss, train_acc, train_f1, val_loss, val_acc, val_f1)
+
+        if trainer.early_stop():
             epoch = e + 1
+            print("early stop on epoch {}".format(epoch))
+            break
 
     test_loss, test_acc, test_f1 = test(model, dataloder_test, device=device)
     print(epoch, test_loss, test_acc, test_f1)

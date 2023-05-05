@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.nn import Conv1d, Linear, LSTM
 
 class MLP(nn.Module):
-    def __init__(self, embedding_dim=50, hidden_size=50, inner_hidden_size=200, dropout=0.5, act=F.relu, init=nn.init.kaiming_uniform_) -> None:
+    def __init__(self, embedding_dim=50, hidden_size=50, inner_hidden_size=200, dropout=0.5, act=F.leaky_relu, init=nn.init.kaiming_uniform_) -> None:
         super().__init__()
         # I'm the believer of Universal Approximation theorem
 
@@ -32,15 +32,16 @@ class MLP(nn.Module):
 
 
 class TextCNN(nn.Module):
-    def __init__(self, embedding_dim=50, convs=[{"out_channels":2, "kernel_size":4}, {"out_channels":2, "kernel_size":3}, {"out_channels":2, "kernel_size":2}]):
+    def __init__(self, embedding_dim=50, act=F.leaky_relu, convs=[{"out_channels":2, "kernel_size":4}, {"out_channels":2, "kernel_size":3}, {"out_channels":2, "kernel_size":2}]):
         super(TextCNN, self).__init__()
         self.convs = nn.ModuleList([Conv1d(in_channels=embedding_dim, **conv) for conv in convs])
         self.global_max_pool = lambda x: F.max_pool1d(x, x.shape[-1])
+        self.act = act
 
     def forward(self, hidden_state: torch.Tensor) -> torch.Tensor:
         # hidden_state.shape = [batch_size, seq_lenth, embedding_dim]
         hidden_state = hidden_state.transpose(2, 1)  # [batch_size, hidden_size, seq_lenth]
-        hidden_state = torch.cat([self.global_max_pool(F.relu(conv(hidden_state))) for conv in self.convs], dim=1)
+        hidden_state = torch.cat([self.global_max_pool(self.act(conv(hidden_state))) for conv in self.convs], dim=1)
         hidden_state = hidden_state.transpose(1, 2)  # [batch_size, out_channels, hidden_size]
         return hidden_state
 

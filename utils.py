@@ -72,13 +72,20 @@ def build_dataset(tokenizer, train_data_path="./Dataset/train.txt", valid_data_p
     return dataset_train, dataset_valid, dataset_test
 
 
-def accuracy(results, labels):
-    pass
+def metric_accuracy(results: torch.Tensor, labels: torch.Tensor) -> float:
+    acc = (results.argmax(-1) == labels).sum().item() / labels.size(0)
+    return acc
 
 
-def f1(results, labels):
-    pass
-
+def metric_f1(results, labels) -> float:
+    TP = ((results.argmax(-1) == 1) & (labels == 1)).sum().item()
+    FN = ((results.argmax(-1) == 0) & (labels == 1)).sum().item()
+    FP = ((results.argmax(-1) == 1) & (labels == 0)).sum().item()
+    TN = ((results.argmax(-1) == 0) & (labels == 0)).sum().item()
+    precision = TP / (TP + FP) if (TP + FP) else 1
+    recall = TP / (TP + FN) if (TP + FN) else 1
+    f1_score =  2 / (1 / precision + 1 / recall)
+    return f1_score
 
 def load_data(train_set="./Dataset/train.txt", valid_set="./Dataset/validation.txt", test_set="./Dataset/test.txt"):
     with open(train_set, "r", encoding="utf-8") as file:
