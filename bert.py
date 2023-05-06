@@ -24,7 +24,7 @@ def compute_metrics(eval_pred, metric):
     return metric.compute(predictions=predictions, references=labels)
 
 
-def train_bert_classifier(model_name="hfl/chinese-roberta-wwm-ext", log_path="./log/roberta", save_path="./model/roberta", num_labels=2, batch_size=1, train_data_file = "./Dataset/train.json", valid_data_file = "./Dataset/valid.json", test_data_file = "./Dataset/test.json", device=torch.device("cpu")):
+def train_bert_classifier(model_name="hfl/chinese-roberta-wwm-ext", log_path="./log/roberta", save_path="./model/roberta", num_labels=2, batch_size=1, num_train_epochs=1, train_data_file = "./Dataset/train.json", valid_data_file = "./Dataset/valid.json", test_data_file = "./Dataset/test.json", device=torch.device("cpu")):
     data_train = load_dataset("json", data_files=train_data_file, field="data", split="train").shuffle()
     data_valid = load_dataset("json", data_files=valid_data_file, field="data", split="train")
     data_test = load_dataset("json", data_files=test_data_file, field="data", split="train")
@@ -58,7 +58,7 @@ def train_bert_classifier(model_name="hfl/chinese-roberta-wwm-ext", log_path="./
         learning_rate=2e-5,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
-        num_train_epochs=4,
+        num_train_epochs=num_train_epochs,
         do_eval=True,
         evaluation_strategy="epoch",
         weight_decay=0.01
@@ -84,5 +84,5 @@ def train_bert_classifier(model_name="hfl/chinese-roberta-wwm-ext", log_path="./
 if __name__ == "__main__":
     # model_name = "hfl/chinese-roberta-wwm-ext"
     # model_name = "bert-base-chinese"
-    train_bert_classifier(model_name="hfl/chinese-roberta-wwm-ext", batch_size=32, log_path="./log/roberta", save_path="./model/roberta", device="cuda" if torch.cuda.is_available() else "cpu")
-    train_bert_classifier(model_name="bert-base-chinese", batch_size=32, log_path="./log/bert", save_path="./model/bert", device="cuda" if torch.cuda.is_available() else "cpu")
+    train_bert_classifier(model_name="hfl/chinese-roberta-wwm-ext", batch_size=32, log_path="./log/roberta-2", save_path="./model/roberta-2", device="cuda" if torch.cuda.is_available() else "cpu", num_train_epochs=2)
+    train_bert_classifier(model_name="bert-base-chinese", batch_size=32, log_path="./log/bert-2", save_path="./model/bert-2", device="cuda" if torch.cuda.is_available() else "cpu", num_train_epochs=2 )

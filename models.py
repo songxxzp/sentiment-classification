@@ -88,7 +88,7 @@ class TextGRU(nn.Module):
 
 
 class Classifier(nn.Module):
-    def __init__(self, base_model: nn.Module, vocab_size, embedding_dim=50, num_classs=2, dropout=0, pretrained_embedding: torch.Tensor=None, embedding_requires_grad=True) -> None:
+    def __init__(self, base_model: nn.Module, vocab_size, embedding_dim=50, num_classs=2, dropout=0, pretrained_embedding: torch.Tensor=None, embedding_requires_grad=True, pool=F.max_pool1d) -> None:
         super().__init__()
         self.hidden_size = base_model.hidden_size
 
@@ -98,6 +98,7 @@ class Classifier(nn.Module):
             self.embedding.weight.data = pretrained_embedding.clone().detach()
         self.embedding.weight.requires_grad_(embedding_requires_grad)
         self.model = base_model
+        self.pool = pool
         self.lm_head = Linear(self.hidden_size, num_classs)
         self.softmax = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
@@ -107,7 +108,7 @@ class Classifier(nn.Module):
         hidden_state = self.model(hidden_state)  # [batch_size, ..., embedding_dim]
         hidden_state = self.dropout(hidden_state)
         hidden_state = hidden_state.transpose(2, 1)  # [batch_size, embedding_dim, ...]
-        hidden_state = F.max_pool1d(hidden_state, hidden_state.shape[-1]).squeeze(-1)
+        hidden_state = self.pool(hidden_state, hidden_state.shape[-1]).squeeze(-1)
         hidden_state = self.lm_head(hidden_state)  # [batch_size, num_classs]
         if return_logits:
             return hidden_state

@@ -1,5 +1,7 @@
 import torch
 
+import torch.nn.functional as F
+
 from train import Trainer
 from models import TextCNN, TextLSTM, TextGRU, MLP, Classifier
 from utils import load_word_vector, Tokenizer, build_dataset, metric_f1, metric_accuracy, setup_random_seed
@@ -23,7 +25,7 @@ if __name__ == "__main__":
     # MLP(inner_hidden_size=200, dropout=0.5)
     # TextCNN(convs=[{"out_channels":20, "kernel_size":4}, {"out_channels":20, "kernel_size":3}, {"out_channels":10, "kernel_size":2}])
 
-    model = Classifier(TextCNN(convs=[{"out_channels":20, "kernel_size":4}, {"out_channels":20, "kernel_size":3}, {"out_channels":10, "kernel_size":2}]), dropout=0, vocab_size=len(vocab), pretrained_embedding=pretrained_embedding).to(device)
+    model = Classifier(TextCNN(convs=[{"out_channels":20, "kernel_size":4}, {"out_channels":20, "kernel_size":3}, {"out_channels":10, "kernel_size":2}]), dropout=0, vocab_size=len(vocab), pretrained_embedding=pretrained_embedding, pool=F.avg_pool1d).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epoch)
