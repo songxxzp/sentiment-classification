@@ -1,5 +1,8 @@
 import json
 import torch
+import random
+import numpy as np
+
 from gensim.models import KeyedVectors
 from typing import Dict, List
 from functools import partial
@@ -34,6 +37,13 @@ def load_word_vector(path='./Dataset/wiki_word2vec_50.bin'):
     pretrained_embedding = torch.cat([torch.zeros((1, 50)), torch.tensor(word2vec_model.vectors), torch.zeros((1, 50))])
     vocab = ["<pad>"] + word2vec_model.index_to_key + ["<unk>"]
     return pretrained_embedding, vocab
+
+
+def setup_random_seed(seed):
+     np.random.seed(seed)
+     random.seed(seed)
+     torch.manual_seed(seed)
+     torch.cuda.manual_seed_all(seed)
 
 
 def process_fn(sample, tokenizer=None):
@@ -84,7 +94,7 @@ def metric_f1(results, labels) -> float:
     TN = ((results.argmax(-1) == 0) & (labels == 0)).sum().item()
     precision = TP / (TP + FP) if (TP + FP) else 1
     recall = TP / (TP + FN) if (TP + FN) else 1
-    f1_score =  2 / (1 / precision + 1 / recall)
+    f1_score = 0 if recall * precision == 0 else (2 / (1 / precision + 1 / recall))
     return f1_score
 
 def load_data(train_set="./Dataset/train.txt", valid_set="./Dataset/validation.txt", test_set="./Dataset/test.txt"):

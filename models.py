@@ -7,11 +7,11 @@ class MLP(nn.Module):
     def __init__(self, embedding_dim=50, hidden_size=50, inner_hidden_size=200, dropout=0.5, act=F.leaky_relu, init=nn.init.kaiming_uniform_) -> None:
         super().__init__()
         # I'm the believer of Universal Approximation theorem
+        self.hidden_size = hidden_size
 
         self.dense_1 = Linear(embedding_dim, inner_hidden_size)
         self.dropout_1 = nn.Dropout(dropout)
         self.dense_2 = Linear(inner_hidden_size, hidden_size)
-        self.dropout_2 = nn.Dropout(dropout)
 
         self.act = act
 
@@ -26,7 +26,6 @@ class MLP(nn.Module):
         hidden_state = self.dropout_1(hidden_state)
         hidden_state = self.act(hidden_state)
         hidden_state = self.dense_2(hidden_state)
-        hidden_state = self.dropout_2(hidden_state)
         hidden_state = self.act(hidden_state)  # [batch_size, seq_length, hidden_size]
         return hidden_state
 
@@ -34,6 +33,8 @@ class MLP(nn.Module):
 class TextCNN(nn.Module):
     def __init__(self, embedding_dim=50, act=F.leaky_relu, convs=[{"out_channels":2, "kernel_size":4}, {"out_channels":2, "kernel_size":3}, {"out_channels":2, "kernel_size":2}]):
         super(TextCNN, self).__init__()
+        self.hidden_size = sum(map(lambda x:x["out_channels"], convs))
+
         self.convs = nn.ModuleList([Conv1d(in_channels=embedding_dim, **conv) for conv in convs])
         self.global_max_pool = lambda x: F.max_pool1d(x, x.shape[-1])
         self.act = act
@@ -49,6 +50,8 @@ class TextCNN(nn.Module):
 class TextLSTM(nn.Module):
     def __init__(self, embedding_dim=50, hidden_size=50, num_layers=1, bidirectional=False):
         super().__init__()
+        self.hidden_size = hidden_size
+
         self.lstm = nn.LSTM(
             input_size=embedding_dim,
             hidden_size=hidden_size,
@@ -67,6 +70,8 @@ class TextLSTM(nn.Module):
 class TextGRU(nn.Module):
     def __init__(self, embedding_dim=50, hidden_size=50, num_layers=1, bidirectional=False):
         super().__init__()
+        self.hidden_size = hidden_size
+
         self.GRU = nn.GRU(
             input_size=embedding_dim,
             hidden_size=hidden_size,
@@ -83,20 +88,24 @@ class TextGRU(nn.Module):
 
 
 class Classifier(nn.Module):
-    def __init__(self, base_model: nn.Module, vocab_size, embedding_dim=50, hidden_size=50, num_classs=2, pretrained_embedding: torch.Tensor=None, embedding_requires_grad=True) -> None:
+    def __init__(self, base_model: nn.Module, vocab_size, embedding_dim=50, num_classs=2, dropout=0, pretrained_embedding: torch.Tensor=None, embedding_requires_grad=True) -> None:
         super().__init__()
+        self.hidden_size = base_model.hidden_size
+
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         if pretrained_embedding is not None:
             assert pretrained_embedding.shape == self.embedding.weight.shape
             self.embedding.weight.data = pretrained_embedding.clone().detach()
         self.embedding.weight.requires_grad_(embedding_requires_grad)
         self.model = base_model
-        self.lm_head = Linear(hidden_size, num_classs)
+        self.lm_head = Linear(self.hidden_size, num_classs)
         self.softmax = nn.Softmax(dim=-1)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, inputs: torch.Tensor, return_logits=True) -> torch.Tensor:
         hidden_state = self.embedding(inputs)
         hidden_state = self.model(hidden_state)  # [batch_size, ..., embedding_dim]
+        hidden_state = self.dropout(hidden_state)
         hidden_state = hidden_state.transpose(2, 1)  # [batch_size, embedding_dim, ...]
         hidden_state = F.max_pool1d(hidden_state, hidden_state.shape[-1]).squeeze(-1)
         hidden_state = self.lm_head(hidden_state)  # [batch_size, num_classs]

@@ -50,20 +50,23 @@ class Trainer:
         if save_model_path is not None:
             torch.save(model.state_dict(), save_model_path)
 
+        train_loss, train_acc, train_f1 = test(model, dataloader_train, device=self.device)
+        val_loss, val_acc, val_f1 = test(model, dataloader_valid, device=self.device)
         test_loss, test_acc, test_f1 = test(model, dataloader_test, device=self.device)
         print(epoch, test_loss, test_acc, test_f1)
 
+        result = {
+            "log": self.logger,
+            "train_loss, train_acc, train_f1": (train_loss, train_acc, train_f1),
+            "val_loss, val_acc, val_f1": (val_loss, val_acc, val_f1),
+            "test_loss, test_acc, test_f1": (test_loss, test_acc, test_f1)
+        }
+
         if save_result_path is not None:
-            train_loss, train_acc, train_f1 = test(model, dataloader_train, device=self.device)
-            val_loss, val_acc, val_f1 = test(model, dataloader_valid, device=self.device)
             with open(save_result_path, 'w', encoding="utf-8") as f:
-                result = {
-                    "log": self.logger,
-                    "train_loss, train_acc, train_f1": (train_loss, train_acc, train_f1),
-                    "val_loss, val_acc, val_f1": (val_loss, val_acc, val_f1),
-                    "test_loss, test_acc, test_f1": (test_loss, test_acc, test_f1)
-                }
                 json.dump(result, f, indent=2)
+
+        return result
 
     def log(self, epoch, train_loss, train_acc, train_f1, val_loss, val_acc, val_f1):
         self.logger.append(
@@ -79,7 +82,7 @@ class Trainer:
         )
 
     def early_stop(self):
-        if self.early_stop_strategy is None:
+        if self.early_stop_strategy is None or self.early_stop_epoch <= 0:
             return False
 
         if len(self.logger) > self.early_stop_epoch:
@@ -96,7 +99,7 @@ class Trainer:
                         break
             elif self.early_stop_strategy == "val_f1":
                 for i in range(len(self.logger) - self.early_stop_epoch, len(self.logger)):
-                    if not(self.logger[i - 1]["val_acc"] > self.logger[i]["val_acc"]):
+                    if not(self.logger[i - 1]["val_f1"] > self.logger[i]["val_f1"]):
                         stop = False
                         break
             else:
