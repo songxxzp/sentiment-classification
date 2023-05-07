@@ -27,8 +27,17 @@ shallow_machine_learning.py
 
 ### TensorBoard
 ```
-cd ./runs
+cd ./tensorboards/runs
+tensorboard --logdir .
 ```
+注：有时可能因为结果过多TensorBoard处理出现bug，可以进入到子文件夹执行`tensorboard --logdir .`
+#### 项目栏说明：
+总览：TIME SERIES
+训练过程：SCALARS
+测试结果：HISTOGRAMS
+查看超参数：Text
+比较超参数：HPARAMS
+
 #### regex example
 ##### 过滤所有仅保存`hparams`的`board`
 ```
@@ -46,7 +55,10 @@ linux:
 ```
 .*TextCNN*
 .*AdamW*
-
+.*early_stop_epoch\=3*
+.*froze_embedding\=False*
+.*avg_pool1d*
+.*dropout\=0*
 .*lr\=1e-5*
 .*lr\=0\.0001*
 ```
