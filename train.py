@@ -7,6 +7,8 @@ import torch.nn.functional as F
 from functools import partial
 from torch import nn
 from torch.utils.data import dataset, dataloader
+from torch.utils.tensorboard import SummaryWriter
+from typing import Dict
 
 from models import TextCNN, TextLSTM, MLP, Classifier
 from utils import load_word_vector, Tokenizer, build_dataset, collate_fn, metric_f1, metric_accuracy
@@ -22,11 +24,17 @@ class Trainer:
         self.valid_dataset = valid_dataset
         self.test_dataset = test_dataset
         self.tokenizer = tokenizer
+        self.summary_writer = None
 
-    def train(self, model: nn.Module, epoch, optimizer, scheduler, batch_size, save_model_path=None, save_result_path=None):
+    def train(self, model: nn.Module, epoch, optimizer, scheduler, batch_size, save_model_path=None, save_result_path=None, info: Dict={}, log_dir=None):
         dataloader_train = dataloader.DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True, collate_fn=partial(collate_fn, tokenizer=self.tokenizer))
         dataloader_valid = dataloader.DataLoader(self.valid_dataset, batch_size=batch_size, shuffle=False, collate_fn=partial(collate_fn, tokenizer=self.tokenizer))
         dataloader_test = dataloader.DataLoader(self.test_dataset, batch_size=batch_size, shuffle=False, collate_fn=partial(collate_fn, tokenizer=self.tokenizer))
+
+        if log_dir is None:
+            self.summary_writer = SummaryWriter()
+        else:
+            self.summary_writer = SummaryWriter(log_dir=log_dir)
 
         for e in range(epoch):
             train_loss, train_acc, train_f1 = train_one_epoch(
@@ -36,8 +44,14 @@ class Trainer:
                 scheduler=scheduler,
                 device=self.device
             )
+            self.summary_writer.add_scalar(tag='Train/loss', scalar_value=float(train_loss), global_step=(e + 1) * len(self.train_dataset))
+            self.summary_writer.add_scalar(tag='Train/acc', scalar_value=float(train_acc), global_step=(e + 1) * len(self.train_dataset))
+            self.summary_writer.add_scalar(tag='Train/f1', scalar_value=float(train_f1), global_step=(e + 1) * len(self.train_dataset))
             print(e + 1, train_loss, train_acc, train_f1)
             val_loss, val_acc, val_f1 = test(model, dataloader_valid, device=self.device)
+            self.summary_writer.add_scalar(tag='Valid/loss', scalar_value=float(val_loss), global_step=(e + 1) * len(self.train_dataset))
+            self.summary_writer.add_scalar(tag='Valid/acc', scalar_value=float(val_acc), global_step=(e + 1) * len(self.train_dataset))
+            self.summary_writer.add_scalar(tag='Valid/f1', scalar_value=float(val_f1), global_step=(e + 1) * len(self.train_dataset))
             print(e + 1, val_loss, val_acc, val_f1)
 
             self.log(e + 1, train_loss, train_acc, train_f1, val_loss, val_acc, val_f1)
@@ -47,13 +61,32 @@ class Trainer:
                 print("early stop on epoch {}".format(epoch))
                 break
 
+        info["epoch"] = epoch
+        for tag, text_string in info.items():
+            self.summary_writer.add_text(tag=str(tag), text_string=str(text_string))
+
         if save_model_path is not None:
             torch.save(model.state_dict(), save_model_path)
 
-        train_loss, train_acc, train_f1 = test(model, dataloader_train, device=self.device)
-        val_loss, val_acc, val_f1 = test(model, dataloader_valid, device=self.device)
         test_loss, test_acc, test_f1 = test(model, dataloader_test, device=self.device)
+        # self.summary_writer.add_scalar(tag='Test/loss', scalar_value=float(test_loss), global_step=(e + 1) * len(self.train_dataset))
+        # self.summary_writer.add_scalar(tag='Test/acc', scalar_value=float(test_acc), global_step=(e + 1) * len(self.train_dataset))
+        # self.summary_writer.add_scalar(tag='Test/f1', scalar_value=float(test_f1), global_step=(e + 1) * len(self.train_dataset))
+        self.summary_writer.add_histogram(tag='Test/loss', values=float(test_loss), global_step=(e + 1) * len(self.train_dataset))
+        self.summary_writer.add_histogram(tag='Test/acc', values=float(test_acc), global_step=(e + 1) * len(self.train_dataset))
+        self.summary_writer.add_histogram(tag='Test/f1', values=float(test_f1), global_step=(e + 1) * len(self.train_dataset))
         print(epoch, test_loss, test_acc, test_f1)
+
+        metric_dict = {
+            "Valid/loss": val_loss,
+            "Valid/acc": val_acc,
+            "Valid/f1": val_f1,
+            "Test/loss": test_loss,
+            "Test/acc": test_acc,
+            "Test/f1": test_f1
+        }
+        self.summary_writer.add_hparams(info, metric_dict=metric_dict)
+        self.summary_writer.close()
 
         result = {
             "log": self.logger,

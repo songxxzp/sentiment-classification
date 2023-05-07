@@ -41,9 +41,9 @@ class TextCNN(nn.Module):
 
     def forward(self, hidden_state: torch.Tensor) -> torch.Tensor:
         # hidden_state.shape = [batch_size, seq_lenth, embedding_dim]
-        hidden_state = hidden_state.transpose(2, 1)  # [batch_size, hidden_size, seq_lenth]
+        hidden_state = hidden_state.transpose(2, 1)  # [batch_size, embedding_dim, seq_lenth]
         hidden_state = torch.cat([self.global_max_pool(self.act(conv(hidden_state))) for conv in self.convs], dim=1)
-        hidden_state = hidden_state.transpose(1, 2)  # [batch_size, out_channels, hidden_size]
+        hidden_state = hidden_state.transpose(1, 2)  # [batch_size, 1, out_channels]
         return hidden_state
 
 
